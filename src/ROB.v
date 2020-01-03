@@ -9,6 +9,7 @@ module ROB(
     /*push or pop*/
     //to id
     input wire add_en_i,
+    input wire add_rdytag_i,
     input wire[4:0] add_regaddr_i,
     input wire[1:0] add_branch_tag_i,
     output reg[4:0] add_id,
@@ -46,10 +47,12 @@ module ROB(
     output reg rrdy1_o,
     output reg rrdy2_o,
     output reg[31:0] rdata1_o,
-    output reg[31:0] rdata2_o
+    output reg[31:0] rdata2_o,
+
+    output reg en_SL_o
 );
 
-parameter cap = 5'h1f;
+parameter cap = 5'h1e;
 
 reg[31:0] data[31:0], pc[31:0];
 reg cond[31:0];
@@ -57,24 +60,33 @@ reg[4:0] regaddr[31:0];
 reg[1:0] branch_tag[31:0];
 reg rdytag[31:0];
 
-reg[4:0] head, tail;
+reg[31:0] head, tail, before;
+
+wire full, empty;
+wire[4:0] head_p, before_p, tail_p;
+
+assign full = (tail + add_en_i - head - commit_rdy_i >= cap) ? 1'b1 : 1'b0;
+assign empty = (tail + add_en_i - head - commit_rdy_i == 1'b0) ? 1'b1 : 1'b0;
+assign head_p = head[4:0] + commit_rdy_i;
+assign before_p = before[4:0];
+assign tail_p = tail[4:0];
 
 always @ (posedge clk) begin
     if (rst || rst_c) begin
-        for (integer i = 0; i < 32; i = i + 1)
-            rdytag[i] = 1'b0;
-        head <= 5'h0;
-        tail <= 5'h0;
+        head <= 1'b0;
+        tail <= 1'b0;
+        before <= 1'b0;
         full_o <= 1'b0;
         empty_o <= 1'b1;
         commit_en_o <= 1'b0;
         add_id <= 5'b0;
+        en_SL_o <= 1'b0;
     end
     else if (rdy) begin
         if (add_en_i) begin
-            regaddr[tail] <= add_regaddr_i;
-            rdytag[tail] <= 1'b0;
-            branch_tag[tail] <= add_branch_tag_i;
+            regaddr[tail_p] <= add_regaddr_i;
+            rdytag[tail_p] <= add_rdytag_i;
+            branch_tag[tail_p] <= add_branch_tag_i;
         end
         if (cdb1_en_i) begin
             rdytag[cdb1_id_ROB_i] <= 1'b1;
@@ -92,21 +104,31 @@ always @ (posedge clk) begin
             rdytag[cdb3_id_ROB_i] <= 1'b1;
             data[cdb3_id_ROB_i] <= cdb3_data_i;
         end
-        add_id <= tail + add_en_i;
+        add_id <= tail_p + add_en_i;
         head <= head + commit_rdy_i;
         tail <= tail + add_en_i;
-        full_o <= (tail - head + add_en_i - commit_rdy_i == cap) ? 1'b1 : 1'b0;
-        empty_o <= (tail - head + add_en_i - commit_rdy_i == 1'b0) ? 1'b1 : 1'b0;
+        full_o <= full;
+        empty_o <= empty;
 
-        if ((tail - head - commit_rdy_i != 1'b0) && 
-            rdytag[head + commit_rdy_i]) begin
+        if (before < tail) begin
+            if (head + commit_rdy_i > before)
+                before <= head + commit_rdy_i;
+            else
+                before <= before + ((branch_tag[before_p] == 2'b11 || branch_tag[before_p] == 2'b00) ? 1'b1 : 1'b0);
+            en_SL_o <= branch_tag[before_p] == 2'b11 ? 1'b1 : 1'b0;
+        end
+        else begin
+            en_SL_o <= 1'b0;
+        end
+
+        if ((tail_p != head_p) && rdytag[head_p]) begin
             commit_en_o <= 1'b1;
-            commit_data_o <= data[head + commit_rdy_i];
-            commit_id_o <= head + commit_rdy_i;
-            commit_regaddr_o <= regaddr[head + commit_rdy_i];
-            commit_pc_o <= pc[head + commit_rdy_i];
-            commit_branch_tag_o <= branch_tag[head + commit_rdy_i];
-            commit_cond_o <= cond[head + commit_rdy_i];
+            commit_data_o <= data[head_p];
+            commit_id_o <= head_p;
+            commit_regaddr_o <= regaddr[head_p];
+            commit_pc_o <= pc[head_p];
+            commit_branch_tag_o <= branch_tag[head_p];
+            commit_cond_o <= cond[head_p];
         end
         else begin
             commit_en_o <= 1'b0;
@@ -117,11 +139,11 @@ end
 always @ (*) begin
     if (rst || rst_c) begin
         rrdy1_o = 1'b0;
-        rdata1_o = 32'bx; 
+        rdata1_o = 32'b0; 
     end
     else if (!re1_i) begin
         rrdy1_o = 1'b0;
-        rdata1_o = 32'bx; 
+        rdata1_o = 32'b0; 
     end
     else if (cdb1_en_i && rid1_i == cdb1_id_ROB_i) begin
         rrdy1_o = 1'b1;
@@ -141,18 +163,18 @@ always @ (*) begin
     end
     else begin
         rrdy1_o = 1'b0;
-        rdata1_o = 32'bx;
+        rdata1_o = 32'b0;
     end
 end
 
 always @ (*) begin
     if (rst || rst_c) begin
         rrdy2_o = 1'b0;
-        rdata2_o = 32'bx; 
+        rdata2_o = 32'b0; 
     end
     else if (!re2_i) begin
         rrdy2_o = 1'b0;
-        rdata2_o = 32'bx; 
+        rdata2_o = 32'b0; 
     end
     else if (cdb1_en_i && rid2_i == cdb1_id_ROB_i) begin
         rrdy2_o = 1'b1;
@@ -172,7 +194,7 @@ always @ (*) begin
     end
     else begin
         rrdy2_o = 1'b0;
-        rdata2_o = 32'bx;
+        rdata2_o = 32'b0;
     end
 end
 

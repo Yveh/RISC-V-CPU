@@ -49,12 +49,12 @@ always @ (posedge clk) begin
         empty <= 1'b1;
         en_o <= 1'b0;
         busy <= 1'b1;
-        A_o <= 32'bx;
-        B_o <= 32'bx;
-        Imm_o <= 32'bx;
-        OP_o <= 32'bx;
-        Funct3_o <= 3'bx;
-        ROB_id_o <= 5'bx;
+        A_o <= 32'b0;
+        B_o <= 32'b0;
+        Imm_o <= 32'b0;
+        OP_o <= 32'b0;
+        Funct3_o <= 3'b0;
+        ROB_id_o <= 5'b0;
     end
     else if (rdy) begin
         if (en_i) begin

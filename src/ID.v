@@ -1,7 +1,6 @@
 module ID(
     input wire clk,
     input wire rst, 
-    input wire rdy,
     //to instqueue
     input wire[31:0] inst_queue_i,
     input wire[31:0] pc_queue_i,
@@ -11,6 +10,7 @@ module ID(
     input wire add_full_ROB_i,
     input wire[4:0] add_id_ROB_i,
     output reg add_en_ROB_o,
+    output reg add_rdytag_o,
     output reg[4:0] add_regaddr_ROB_o,
     output reg[1:0] add_branch_tag_ROB_o,
     //to regfile
@@ -41,6 +41,7 @@ always @ (*) begin
 
         wait_regaddr_regfile_o = 5'b0;
         wait_id_regfile_o = 5'b0;
+        add_rdytag_o = 1'b0;
         add_regaddr_ROB_o = 5'b0;
         add_branch_tag_ROB_o = 2'b0;
         Imm_o = 32'b0;
@@ -52,7 +53,7 @@ always @ (*) begin
         A_addr_o = 5'b0;
         B_addr_o = 5'b0;
     end
-    else if (rdy) begin
+    else begin
         re_queue_o = 1'b0;
         add_en_ROB_o = 1'b0;
         wait_en_regfile_o = 1'b0;
@@ -60,6 +61,7 @@ always @ (*) begin
 
         wait_regaddr_regfile_o = inst_queue_i[11:7];
         wait_id_regfile_o = add_id_ROB_i;
+        add_rdytag_o = 1'b0;
         add_regaddr_ROB_o = inst_queue_i[11:7];
         add_branch_tag_ROB_o = 2'b0;
         OP_o = inst_queue_i[6:0];
@@ -99,6 +101,7 @@ always @ (*) begin
                     if (!add_full_ROB_i && !busySL_i) begin
                         re_queue_o = 1'b1;
                         add_en_ROB_o = 1'b1;
+                        add_branch_tag_ROB_o = 2'b11;
                         RS_id_o = 3'b100;
                         wait_en_regfile_o = 1'b1;
                     end
@@ -145,7 +148,9 @@ always @ (*) begin
                     if (!busySL_i) begin
                         re_queue_o = 1'b1;
                         add_en_ROB_o = 1'b1;
+                        add_rdytag_o = 1'b1;
                         add_regaddr_ROB_o = 5'b0;
+                        add_branch_tag_ROB_o = 2'b11;
                         RS_id_o = 3'b100;
                     end
                     Imm_o = {{20{inst_queue_i[31]}}, inst_queue_i[31:25], inst_queue_i[11:7]};

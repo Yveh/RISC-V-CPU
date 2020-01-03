@@ -40,7 +40,11 @@ reg[31:0] data_o;
 reg[1:0] mod_p;
 
 always @ (posedge clk) begin
-    if (rst || rst_c) begin
+    if (rst) begin
+        inst_rdy_o <= 1'b0;
+        data_rdy_o <= 1'b0;
+    end
+    else if (rst_c && mod_p != Wdata && mod_p != Rdata) begin
         inst_rdy_o <= 1'b0;
         data_rdy_o <= 1'b0;
     end
@@ -160,7 +164,12 @@ always @ (posedge clk) begin
 end
 
 always @ (posedge clk) begin
-    if (rst || rst_c) begin
+    if (rst) begin
+        state <= IDLE;
+        state_p <= IDLE;
+        mod_p <= None;
+    end
+    else if (rst_c && mod_p != Wdata && mod_p != Rdata) begin
         state <= IDLE;
         state_p <= IDLE;
         mod_p <= None;
@@ -220,6 +229,9 @@ always @ (*) begin
         ram_data_o = 8'b0;
     end
     else begin
+        ram_rw_o = 1'b0;
+        ram_addr_o = 32'b0;
+        ram_data_o = 8'b0;
         case (state)
             S0: begin
                 case (mod_p)
@@ -302,15 +314,26 @@ always @ (*) begin
                 endcase
             end
             OK: begin
-                ram_rw_o = 1'b0;
-                ram_addr_o = 32'b0;
-                ram_data_o = 8'b0;
+                case (mod_p)
+                    Rinst: begin
+                        ram_rw_o = 1'b0;
+                        ram_addr_o = {14'b0, inst_addr_i[17:16], 16'b0};
+                        ram_data_o = 8'b0;
+                    end
+                    Rdata: begin
+                        ram_rw_o = 1'b0;
+                        ram_addr_o = {14'b0, data_addr_i[17:16], 16'b0};
+                        ram_data_o = 8'b0;
+                    end
+                    Wdata: begin
+                        ram_rw_o = 1'b1;
+                        ram_addr_o = {14'b0, data_addr_i[17:16], 16'b0};
+                        ram_data_o = 8'b0;
+                    end
+                    default: ;
+                endcase
             end
-            default: begin
-                ram_rw_o = 1'b0;
-                ram_addr_o = 32'b0;
-                ram_data_o = 8'b0;
-            end
+            default: ;
         endcase
     end
 end

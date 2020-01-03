@@ -5,9 +5,9 @@ module datacache(
 
     input wire en_i,
     input wire rw_i,
+    input wire[2:0] width_i,
     input wire[31:0] addr_i,
     input wire[31:0] data_i,
-    input wire[2:0] width_i,
     output reg rdy_o,
     output reg[31:0] data_o,
     //RC
@@ -21,79 +21,29 @@ module datacache(
 );
 
 
-reg[7:0] cache[1023:0];
-reg[21:0] tag[1023:0];
-reg valid[1023:0];
+reg[31:0] cache[511:0];
+reg[20:0] tag[511:0];
+reg[511:0] valid;
 
 always @ (posedge clk) begin
     if (rst) begin
-        for (integer i = 0; i < 1024; i = i + 1)
-            valid[i] <= 1'b0;
+        valid <= 1'b0;
     end
     else if (rdy) begin
-        if (rdy_i && !rw_i) begin
-            case (width_i)
-                3'h1: begin
-                    tag[addr_i[9:0]] <= addr_i[31:10];
-                    cache[addr_i[9:0]] <= data_i[7:0];
-                    valid[addr_i[9:0]] <= 1'b1;
-                end 
-                3'h2: begin
-                    tag[addr_i[9:0]] <= addr_i[31:10];
-                    tag[addr_i[9:0] + 3'h1] <= {{10'b0, addr_i} + 3'h1} >> 10;
-                    cache[addr_i[9:0]] <= data_i[7:0];
-                    cache[addr_i[9:0] + 3'h1] <= data_i[15:8];
-                    valid[addr_i[9:0]] <= 1'b1;
-                    valid[addr_i[9:0] + 3'h1] <= 1'b1;
-                end
-                3'h4: begin
-                    tag[addr_i[9:0]] <= addr_i[31:10];
-                    tag[addr_i[9:0] + 3'h1] <= {{10'b0, addr_i} + 3'h1} >> 10;
-                    tag[addr_i[9:0] + 3'h2] <= {{10'b0, addr_i} + 3'h2} >> 10;
-                    tag[addr_i[9:0] + 3'h3] <= {{10'b0, addr_i} + 3'h3} >> 10;
-                    cache[addr_i[9:0]] <= data_i[7:0];
-                    cache[addr_i[9:0] + 3'h1] <= data_i[15:8];
-                    cache[addr_i[9:0] + 3'h2] <= data_i[23:16];
-                    cache[addr_i[9:0] + 3'h3] <= data_i[31:24];
-                    valid[addr_i[9:0]] <= 1'b1;
-                    valid[addr_i[9:0] + 3'h1] <= 1'b1;
-                    valid[addr_i[9:0] + 3'h2] <= 1'b1;
-                    valid[addr_i[9:0] + 3'h3] <= 1'b1;
-                end
-                default: ;
-            endcase
+        if (rdy_i && !rw_i && addr_i[17:16] != 2'b11) begin
+            if (width_i == 3'h4) begin
+                tag[addr_i[10:2]] <= addr_i[31:11];
+                cache[addr_i[10:2]] <= data_i;
+                valid[addr_i[10:2]] <= 1'b1;
+            end
+            else begin
+                valid[addr_i[10:2]] <= 1'b0;
+            end
         end
-        else if (rdy_i && rw_i) begin
-            case (width_i)
-                3'h1: begin
-                    tag[addr_i[9:0]] <= addr_i[31:10];
-                    cache[addr_i[9:0]] <= data_rc_i[7:0];
-                    valid[addr_i[9:0]] <= 1'b1;
-                end 
-                3'h2: begin
-                    tag[addr_i[9:0]] <= addr_i[31:10];
-                    tag[addr_i[9:0] + 3'h1] <= {{10'b0, addr_i} + 3'h1} >> 10;
-                    cache[addr_i[9:0]] <= data_rc_i[7:0];
-                    cache[addr_i[9:0] + 3'h1] <= data_rc_i[15:8];
-                    valid[addr_i[9:0]] <= 1'b1;
-                    valid[addr_i[9:0] + 3'h1] <= 1'b1;
-                end
-                3'h4: begin
-                    tag[addr_i[9:0]] <= addr_i[31:10];
-                    tag[addr_i[9:0] + 3'h1] <= {{10'b0, addr_i} + 3'h1} >> 10;
-                    tag[addr_i[9:0] + 3'h2] <= {{10'b0, addr_i} + 3'h2} >> 10;
-                    tag[addr_i[9:0] + 3'h3] <= {{10'b0, addr_i} + 3'h3} >> 10;
-                    cache[addr_i[9:0]] <= data_rc_i[7:0];
-                    cache[addr_i[9:0] + 3'h1] <= data_rc_i[15:8];
-                    cache[addr_i[9:0] + 3'h2] <= data_rc_i[23:16];
-                    cache[addr_i[9:0] + 3'h3] <= data_rc_i[31:24];
-                    valid[addr_i[9:0]] <= 1'b1;
-                    valid[addr_i[9:0] + 3'h1] <= 1'b1;
-                    valid[addr_i[9:0] + 3'h2] <= 1'b1;
-                    valid[addr_i[9:0] + 3'h3] <= 1'b1;
-                end
-                default: ;
-            endcase
+        else if (rdy_i && rw_i && addr_i[17:16] != 2'b11) begin
+            tag[addr_i[10:2]] <= addr_i[31:11];
+            cache[addr_i[10:2]] <= data_rc_i;
+            valid[addr_i[10:2]] <= 1'b1;
         end
     end
 end
@@ -119,67 +69,114 @@ always @ (*) begin
     end
     else if (rdy_i && rw_i) begin
         rdy_o = 1'b1;
-        data_o = data_rc_i;
+        if (addr_i[17:16] == 2'b11) begin
+            data_o = data_rc_i;
+        end
+        else begin
+            case (width_i)
+                3'h1: begin
+                    case (addr_i[1:0])
+                        2'b00:
+                            data_o = {24'b0, data_rc_i[7:0]};
+                        2'b01:
+                            data_o = {24'b0, data_rc_i[15:8]};
+                        2'b10:
+                            data_o = {24'b0, data_rc_i[23:16]};
+                        2'b11:
+                            data_o = {24'b0, data_rc_i[31:24]};
+                        default:
+                            data_o = 32'b0;
+                    endcase
+                end
+                3'h2: begin
+                    case (addr_i[1:0])
+                        2'b00:
+                            data_o = {16'b0, data_rc_i[15:0]};
+                        2'b01:
+                            data_o = {16'b0, data_rc_i[23:8]};
+                        2'b10:
+                            data_o = {16'b0, data_rc_i[31:16]};
+                        default: 
+                            data_o = 32'b0;
+                    endcase
+                end
+                3'h4: begin
+                    data_o = data_rc_i;
+                end
+                default: 
+                    data_o = 32'b0;
+            endcase
+        end
         en_o = 1'b0;
         rw_o = 1'b0;
         width_o = 1'b0;
         addr_rc_o = 32'b0;
         data_rc_o = 32'b0;
     end
-    else if (rw_i) begin
+    else if (!rw_i) begin
+        rdy_o = 1'b0;
+        data_o = 32'b0;
+        en_o = 1'b1;
+        rw_o = 1'b0;
+        addr_rc_o = addr_i;
+        data_rc_o = data_i;
+        width_o = width_i;
+    end
+    else begin
         rdy_o = 1'b0;
         data_o = 32'b0;
         en_o = 1'b0;
         rw_o = 1'b1;
-        width_o = width_i;
+        width_o = 1'b0;
         addr_rc_o = 32'b0;
         data_rc_o = 32'b0;
-        case (width_i)
-            3'h1: begin
-                if (valid[addr_i[9:0]] && tag[addr_i[9:0]] == addr_i[31:10]) begin
-                    rdy_o = 1'b1;
-                    data_o = {24'b0, cache[addr_i[9:0]]};
+        if (valid[addr_i[10:2]] && tag[addr_i[10:2]] == addr_i[31:11]) begin
+            rdy_o = 1'b1;
+            case (width_i)
+                3'h1: begin
+                    case (addr_i[1:0])
+                        2'b00:
+                            data_o = {24'b0, cache[addr_i[10:2]][7:0]};
+                        2'b01:
+                            data_o = {24'b0, cache[addr_i[10:2]][15:8]};
+                        2'b10:
+                            data_o = {24'b0, cache[addr_i[10:2]][23:16]};
+                        2'b11:
+                            data_o = {24'b0, cache[addr_i[10:2]][31:24]};
+                        default:
+                            data_o = 32'b0;
+                    endcase
                 end
-                else begin
-                    en_o = 1'b1;
-                    addr_rc_o = addr_i;
+                3'h2: begin
+                    case (addr_i[1:0])
+                        2'b00:
+                            data_o = {16'b0, cache[addr_i[10:2]][15:0]};
+                        2'b01:
+                            data_o = {16'b0, cache[addr_i[10:2]][23:8]};
+                        2'b10:
+                            data_o = {16'b0, cache[addr_i[10:2]][31:16]};
+                        default: 
+                            data_o = 32'b0;
+                    endcase
                 end
+                3'h4: begin
+                    data_o = cache[addr_i[10:2]];
+                end
+                default: 
+                    data_o = 32'b0;
+            endcase
+        end
+        else begin
+            en_o = 1'b1;
+            if (addr_i[17:16] == 2'b11) begin
+                width_o = width_i;
+                addr_rc_o = addr_i;
             end
-            3'h2: begin
-                if (valid[addr_i[9:0]] && tag[addr_i[9:0]] == addr_i[31:10] &&
-                    valid[addr_i[9:0] + 3'h1] && tag[addr_i[9:0] + 3'h1] == {{10'b0, addr_i} + 3'h1} >> 10) begin
-                    rdy_o = 1'b1;
-                    data_o = {16'b0, cache[addr_i[9:0] + 3'h1], cache[addr_i[9:0]]};
-                end
-                else begin
-                    en_o = 1'b1;
-                    addr_rc_o = addr_i;
-                end
+            else begin
+                width_o = 3'h4;
+                addr_rc_o = {addr_i[31:2], 2'b0};
             end
-            3'h4: begin
-                if (valid[addr_i[9:0]] && tag[addr_i[9:0]] == addr_i[31:10] &&
-                    valid[addr_i[9:0] + 3'h1] && tag[addr_i[9:0] + 3'h1] == {{10'b0, addr_i} + 3'h1} >> 10 &&
-                    valid[addr_i[9:0] + 3'h2] && tag[addr_i[9:0] + 3'h2] == {{10'b0, addr_i} + 3'h2} >> 10 &&
-                    valid[addr_i[9:0] + 3'h3] && tag[addr_i[9:0] + 3'h3] == {{10'b0, addr_i} + 3'h3} >> 10) begin
-                    rdy_o = 1'b1;
-                    data_o = {cache[addr_i[9:0] + 3'h3], cache[addr_i[9:0] + 3'h2], cache[addr_i[9:0] + 3'h1], cache[addr_i[9:0]]};
-                end
-                else begin
-                    en_o = 1'b1;
-                    addr_rc_o = addr_i;
-                end
-            end
-            default: ;
-        endcase
-    end
-    else begin
-        // rdy_o = 1'b0;
-        // data_o = 32'b0;
-        // en_o = 1'b1;
-        // rw_o = 1'b0;
-        // width_o = width_i;
-        // addr_rc_o = addr_i;
-        // data_rc_o = data_i;
+        end
     end
 end
 

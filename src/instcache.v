@@ -14,19 +14,20 @@ module instcache(
     output reg[31:0] addr_o
 );
 
-reg[31:0] cache[1023:0];
-reg[21:0] tag[1023:0];
-reg valid[1023:0];
+reg[31:0] cache[511:0];
+reg[20:0] tag[511:0];
+reg[511:0] valid;
 
 always @ (posedge clk) begin
     if (rst) begin
-        for (integer i = 0; i < 1024; i = i + 1)
-            valid[i] <= 1'b0;
+        valid = 1'b0;
     end
-    else if (rdy && rdy_i) begin
-        tag[addr_i[9:0]] <= addr_i[31:10];
-        cache[addr_i[9:0]] <= inst_i;
-        valid[addr_i[9:0]] <= 1'b1;
+    else if (rdy) begin
+        if (rdy_i) begin
+            tag[addr_i[10:2]] <= addr_i[31:11];
+            cache[addr_i[10:2]] <= inst_i;
+            valid[addr_i[10:2]] <= 1'b1;
+        end
     end
 end
 
@@ -43,9 +44,9 @@ always @ (*) begin
         en_o = 1'b0;
         addr_o = 32'b0;
     end
-    else if (valid[addr_i[9:0]] && tag[addr_i[9:0]] == addr_i[31:10]) begin
+    else if (valid[addr_i[10:2]] && tag[addr_i[10:2]] == addr_i[31:11]) begin
         rdy_o = 1'b1;
-        inst_o = cache[addr_i[9:0]];
+        inst_o = cache[addr_i[10:2]];
         en_o = 1'b0;
         addr_o = 32'b0;
     end

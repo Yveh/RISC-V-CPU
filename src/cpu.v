@@ -87,7 +87,7 @@ wire[31:0] RS3_A_i, RS3_B_i, RS3_Imm_i;
 wire[4:0] RS3_A_id_i, RS3_B_id_i, RS3_ROB_id_i;
 wire[6:0] RS3_OP_i;
 wire[2:0] RS3_Funct3_i;
-wire RS3_full_LSB_i;
+wire RS3_full_SLB_i;
 
 wire EX1_en_i;
 wire[31:0] EX1_A_i, EX1_B_i, EX1_Imm_i, EX1_pc_i;
@@ -108,7 +108,7 @@ wire[4:0] regfile_waddr_i, regfile_wid_i;
 wire[31:0] regfile_wdata_i; 
 
 wire ROB_add_en_i, ROB_re1_i, ROB_re2_i;
-wire ROB_commit_rdy_i;
+wire ROB_commit_rdy_i, ROB_add_rdytag_i;
 wire[4:0] ROB_add_regaddr_i, ROB_rid1_i, ROB_rid2_i;
 wire[1:0] ROB_branch_tag_i;
 
@@ -118,12 +118,12 @@ wire[31:0] commit_data_i, commit_pc_i;
 wire[1:0] commit_branch_tag_i;
 wire commit_cond_i;
 
-wire LSB_en_i, LSB_add_en_i, LSB_rdy_i;
-wire[31:0] LSB_A_i, LSB_B_i, LSB_Imm_i, LSB_data_i;
-wire[6:0] LSB_OP_i;
-wire[2:0] LSB_Funct3_i;
-wire[4:0] LSB_ROB_id_i, LSB_LS_id_i;
-wire[1:0] LSB_branch_tag_i;
+wire SLB_en_i, SLB_add_en_i, SLB_rdy_i, SLB_en_SL_i;
+wire[31:0] SLB_A_i, SLB_B_i, SLB_Imm_i, SLB_data_i;
+wire[6:0] SLB_OP_i;
+wire[2:0] SLB_Funct3_i;
+wire[4:0] SLB_ROB_id_i, SLB_LS_id_i;
+wire[1:0] SLB_branch_tag_i;
 
 wire cdb1_en, cdb2_en, cdb3_en;
 wire[4:0] cdb1_id_ROB, cdb2_id_ROB, cdb3_id_ROB;
@@ -167,7 +167,6 @@ instqueue instqueue0(
 ID ID0(
     .clk(clk_in),
     .rst(rst_in),
-    .rdy(rdy_in),
     //to instqueue
     .inst_queue_i(ID_inst_queue_i),
     .pc_queue_i(ID_pc_queue_i),
@@ -177,6 +176,7 @@ ID ID0(
     .add_full_ROB_i(ID_full_ROB_i),
     .add_id_ROB_i(ID_add_id_ROB_i),
     .add_en_ROB_o(ROB_add_en_i),
+    .add_rdytag_o(ROB_add_rdytag_i),
     .add_branch_tag_ROB_o(ROB_branch_tag_i),
     .add_regaddr_ROB_o(ROB_add_regaddr_i),
     //to regfile
@@ -391,14 +391,14 @@ RS_SL RS3(
     .cdb3_id_ROB_i(cdb3_id_ROB),
     .cdb3_data_i(cdb3_data),
 
-    .full_i(RS3_full_LSB_i),
-    .A_o(LSB_A_i),
-    .B_o(LSB_B_i),
-    .Imm_o(LSB_Imm_i),
-    .OP_o(LSB_OP_i),
-    .Funct3_o(LSB_Funct3_i),
-    .ROB_id_o(LSB_ROB_id_i),
-    .en_o(LSB_en_i)
+    .full_i(RS3_full_SLB_i),
+    .A_o(SLB_A_i),
+    .B_o(SLB_B_i),
+    .Imm_o(SLB_Imm_i),
+    .OP_o(SLB_OP_i),
+    .Funct3_o(SLB_Funct3_i),
+    .ROB_id_o(SLB_ROB_id_i),
+    .en_o(SLB_en_i)
 );
 
 EX EX1(
@@ -448,6 +448,7 @@ ROB ROB0(
     .empty_o(),
     //to ID
     .add_en_i(ROB_add_en_i),
+    .add_rdytag_i(ROB_add_rdytag_i),
     .add_regaddr_i(ROB_add_regaddr_i),
     .add_branch_tag_i(ROB_branch_tag_i),
     .add_id(ID_add_id_ROB_i),
@@ -484,7 +485,9 @@ ROB ROB0(
 
     .cdb3_en_i(cdb3_en),
     .cdb3_id_ROB_i(cdb3_id_ROB),
-    .cdb3_data_i(cdb3_data)
+    .cdb3_data_i(cdb3_data),
+
+    .en_SL_o(SLB_en_SL_i)
 );
 
 commit commit0(
@@ -541,18 +544,20 @@ SLbuffer SLbuffer0(
     .rdy(rdy_in),
     
     .empty_o(),
-    .full_o(RS3_full_LSB_i),
+    .full_o(RS3_full_SLB_i),
+
+    .en_SL_i(SLB_en_SL_i),
     
-    .RS_en_i(LSB_en_i),
-    .A_i(LSB_A_i),
-    .B_i(LSB_B_i),
-    .Imm_i(LSB_Imm_i),
-    .OP_i(LSB_OP_i),
-    .Funct3_i(LSB_Funct3_i),
-    .ROB_id_i(LSB_ROB_id_i),
+    .RS_en_i(SLB_en_i),
+    .A_i(SLB_A_i),
+    .B_i(SLB_B_i),
+    .Imm_i(SLB_Imm_i),
+    .OP_i(SLB_OP_i),
+    .Funct3_i(SLB_Funct3_i),
+    .ROB_id_i(SLB_ROB_id_i),
     
-    .rdy_i(LSB_rdy_i),
-    .data_i(LSB_data_i),
+    .rdy_i(SLB_rdy_i),
+    .data_i(SLB_data_i),
     .en_o(datacache_en_i),
     .rw_o(datacache_rw_i),
     .addr_o(datacache_addr_i),
@@ -590,8 +595,8 @@ datacache datacache0(
     .addr_i(datacache_addr_i),
     .data_i(datacache_data_i),
     .width_i(datacache_width_i),
-    .rdy_o(LSB_rdy_i),
-    .data_o(LSB_data_i),
+    .rdy_o(SLB_rdy_i),
+    .data_o(SLB_data_i),
 
     .rdy_i(datacache_rdy_i),
     .data_rc_i(datacache_data_rc_i),

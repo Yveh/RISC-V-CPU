@@ -111,7 +111,7 @@ always @ (*) begin
                 cdb_cond_o = 1'b1;
             end
             7'b1100011: begin
-                cdb_data_o = 32'bx;
+                cdb_data_o = 32'b0;
                 cdb_pc_o = pc_i + Imm_i;
                 case (Funct3_i)
                     3'b000:

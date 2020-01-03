@@ -31,7 +31,8 @@ always @ (posedge clk) begin
         if (en_i) begin
             pc <= pc_i;
             npc <= pc_i + 32'h4;
-            en_cache_o <= 1'b0;
+            en_cache_o <= 1'b1;
+            addr_cache_o <= pc_i;
             we_queue_o <= 1'b0;
         end
         else if (rdy_cache_i && !full_queue_i) begin

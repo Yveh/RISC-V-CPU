@@ -30,14 +30,11 @@ module regfile(
 
 reg[31:0] regs[31:0];
 reg[4:0] rid[31:0];
-reg rdytag[31:0];
+reg[31:0] rdytag;
 
 always @ (posedge clk or negedge rst) begin
     if (rst) begin
-        for (integer i = 0; i < 32; i = i + 1) begin
-            regs[i] <= 1'b0;
-            rdytag[i] <= 1'b1;
-        end
+        rdytag <= 32'hffffffff;
     end
     else if (rdy) begin
         if (we && waddr != 1'b0)
@@ -46,8 +43,7 @@ always @ (posedge clk or negedge rst) begin
             rid[saddr] <= sid;
 
         if (rst_c) begin
-            for (integer i = 0; i < 32; i = i + 1)
-                rdytag[i] <= 1'b1;
+            rdytag <= 32'hffffffff;
         end
         else if (se && we && waddr == saddr) begin
             rdytag[saddr] <= 1'b0;

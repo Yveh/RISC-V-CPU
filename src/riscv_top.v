@@ -13,7 +13,7 @@ module riscv_top
 	output wire			led
 );
 
-localparam SYS_CLK_FREQ = 100000000;
+localparam SYS_CLK_FREQ = 80000000;
 localparam UART_BAUD_RATE = 115200;
 localparam RAM_ADDR_WIDTH = 17; 			// 128KiB ram, should not be modified
 
@@ -23,7 +23,8 @@ reg rst_delay;
 wire clk;
 
 // assign EXCLK (or your own clock module) to clk
-assign clk = EXCLK;
+//assign clk = EXCLK;
+clk_wiz_0 ccc(.reset(btnC), .clk_in1(EXCLK), .clk_out1(clk), .locked());
 
 always @(posedge clk or posedge btnC)
 begin
@@ -129,6 +130,7 @@ hci #(.SYS_CLK_FREQ(SYS_CLK_FREQ),
 
 assign hci_io_sel	= cpumc_a[2:0];
 assign hci_io_en	= (cpumc_a[RAM_ADDR_WIDTH:RAM_ADDR_WIDTH-1] == 2'b11) ? 1'b1 : 1'b0;
+
 assign hci_io_wr	= cpumc_wr;
 assign hci_io_din	= cpumc_din;
 
